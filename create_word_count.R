@@ -27,8 +27,7 @@ file_list <- dbGetQuery(pg, "
     WHERE call_type=1 AND
         (file_name, last_update) NOT IN
             (SELECT file_name, last_update
-             FROM  jpark.word_count)
-    LIMIT 100")
+             FROM  jpark.word_count)")
 
 rs <- dbDisconnect(pg)
 
