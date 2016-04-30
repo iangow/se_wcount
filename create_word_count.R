@@ -2,31 +2,21 @@ library("RPostgreSQL")
 
 pg <- dbConnect(PostgreSQL())
 
-# dbSendQuery(pg, "CREATE LANGUAGE plpythonu")
-rs <- dbSendQuery(pg, "
-    CREATE OR REPLACE FUNCTION array_min(an_array integer[])
-        RETURNS integer AS
-    $BODY$
-        if an_array is None:
-            return None
-        return min(an_array)
-    $BODY$ LANGUAGE plpythonu")
-
-if (!dbExistsTable(pg, c("streetevents", "qa_pairs"))) {
+if (!dbExistsTable(pg, c("jpark", "word_count"))) {
     dbGetQuery(pg, "
-        DROP TABLE IF EXISTS streetevents.qa_pairs;
+        DROP TABLE IF EXISTS jpark.word_count;
 
-        CREATE TABLE streetevents.qa_pairs
+        CREATE TABLE jpark.word_count
         (
           file_name text,
           last_update timestamp without time zone,
-          answer_nums integer[],
-          question_nums integer[]
+          context text,
+          word_count integer
         );
 
-        CREATE INDEX ON streetevents.qa_pairs (file_name, last_update);
+        CREATE INDEX ON jpark.word_count (file_name, last_update);
 
-        GRANT SELECT ON streetevents.qa_pairs TO personality_access;")
+        ALTER TABLE jpark.word_count OWNER TO jpark;")
 }
 
 file_list <- dbGetQuery(pg, "
@@ -37,13 +27,14 @@ file_list <- dbGetQuery(pg, "
     WHERE call_type=1 AND
         (file_name, last_update) NOT IN
             (SELECT file_name, last_update
-             FROM streetevents.qa_pairs)")
+             FROM  jpark.word_count)
+    LIMIT 100")
 
 rs <- dbDisconnect(pg)
 
-addQAPairs <- function(file_name) {
+addData <- function(file_name) {
     library("RPostgreSQL")
-    sql <- paste(readLines("qa_pairs/create_qa_pairs.sql"), collapse="\n")
+    sql <- paste(readLines("create_word_count.sql"), collapse="\n")
 
     pg <- dbConnect(PostgreSQL())
     dbGetQuery(pg, sprintf(sql, file_name, file_name))
@@ -51,5 +42,5 @@ addQAPairs <- function(file_name) {
 }
 
 library(parallel)
-system.time(res <- unlist(mclapply(file_list$file_name, addQAPairs, mc.cores=8)))
+system.time(res <- unlist(mclapply(file_list$file_name, addData, mc.cores=8)))
 
